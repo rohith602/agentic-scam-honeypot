@@ -24,7 +24,7 @@ class HoneyPotAgent:
 
         # Use verified working model with System Instruction
         self.model = genai.GenerativeModel(
-            'models/gemini-2.5-flash',
+            'models/gemini-3-flash-preview',
             system_instruction=self.system_instruction
         )
         self.scam_detection_model = genai.GenerativeModel('models/gemini-2.5-flash')
@@ -59,15 +59,19 @@ class HoneyPotAgent:
             "Respond ONLY with 'TRUE' if it is a scam (phishing, financial fraud, urgency) "
             "or 'FALSE' if it is safe."
         )
+        keywords = ["block", "suspend", "verify", "pan", "kyc", "urgent", "credit card", "bank", "expire"]
+        keyword_match = any(k in text.lower() for k in keywords)
+
         try:
-            response = self.model.generate_content(prompt)
-            return "TRUE" in response.text.upper()
+            response = self.scam_detection_model.generate_content(prompt)
+            model_flag = "TRUE" in response.text.upper()
+            
+            # Hybrid Logic: If Model says TRUE or Keywords match -> Scam
+            # This balances model intelligence with keyword safety.
+            return model_flag or keyword_match
         except:
-            # Fallback heuristic: keyword based
-            keywords = ["block", "suspend", "verify", "pan", "kyc", "urgent", "credit card", "bank", "expire"]
-            if any(k in text.lower() for k in keywords):
-                return True
-            return False
+            # Fallback heuristic
+            return keyword_match
 
     async def extract_smart_intelligence(self, text: str) -> dict:
         # Use LLM to extract bank accounts or subtle info
@@ -76,7 +80,7 @@ class HoneyPotAgent:
             "Return JSON format: {{'bankAccounts': [], 'amounts': []}}. Return empty lists if none found."
         )
         try:
-            response = self.model.generate_content(prompt, generation_config={"response_mime_type": "application/json"})
+            response = self.scam_detection_model.generate_content(prompt, generation_config={"response_mime_type": "application/json"})
             return json.loads(response.text)
         except:
             return {}

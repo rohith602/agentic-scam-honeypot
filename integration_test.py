@@ -19,7 +19,7 @@ async def test_scam_flow():
     
     print("Sending Message 1...")
     async with httpx.AsyncClient() as client:
-        resp = await client.post(url, json=payload1, headers=headers, timeout=30.0)
+        resp = await client.post(url, json=payload1, headers=headers, timeout=60.0)
         print("Response 1:", json.dumps(resp.json(), indent=2))
         
         # Payload 2: Follow up with UPI
@@ -37,7 +37,7 @@ async def test_scam_flow():
         }
         
         print("\nSending Message 2...")
-        resp2 = await client.post(url, json=payload2, headers=headers, timeout=30.0)
+        resp2 = await client.post(url, json=payload2, headers=headers, timeout=60.0)
         print("Response 2:", json.dumps(resp2.json(), indent=2))
 
 if __name__ == "__main__":
