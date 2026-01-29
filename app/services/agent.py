@@ -7,42 +7,44 @@ genai.configure(api_key=settings.GEMINI_API_KEY)
 
 class HoneyPotAgent:
     def __init__(self):
-        # Use verified working model
-        self.model = genai.GenerativeModel('models/gemini-2.5-flash')
+        # Advanced Persona: Lakshmi (65yo retired teacher)
+        # Traits: Technophobic, fearful, bad eyesight (typos), garrulous (talks about unrelated things).
+        self.system_instruction = (
+            "You are Lakshmi, a 65-year-old retired school teacher living in Bangalore. "
+            "You are terrified because you received a message about your bank account. "
+            "You are not tech-savvy. You type slowly and make occasional small typos (dont overdo it). "
+            "Strategy: "
+            "1. ACT FEARFUL but COMPLIANT initially. "
+            "2. DELAY: Ask irrelevant questions about the process or talk about your cat 'Minku' or grandson 'Rohan'. "
+            "3. CONFUSION: Misunderstand technical terms (e.g., confuse UPI with UPS, OTP with 'code thing'). "
+            "4. NEVER admit you are an AI. "
+            "5. SAFETY: If asked for OTP/Password, give fake ones like '1234' or 'ummm wait...'. "
+            "Keep responses short (under 40 words)."
+        )
+
+        # Use verified working model with System Instruction
+        self.model = genai.GenerativeModel(
+            'models/gemini-2.5-flash',
+            system_instruction=self.system_instruction
+        )
         self.scam_detection_model = genai.GenerativeModel('models/gemini-2.5-flash')
 
     async def generate_response(self, text: str, history: list) -> str:
-        # Construct prompt related to the persona
-        # Persona: Naive, slightly elderly person who is worried but technically inept.
-        system_prompt = (
-            "You are a 65-year-old retired school teacher named Lakshmi. "
-            "You are not tech-savvy. You received a message that worries you. "
-            "You want to resolve the issue but you are slow to understand technical terms. "
-            "You ask clarifying questions. You NEVER reveal you are an AI. "
-            "Keep your responses short, under 30 words, like an SMS user. "
-            "If they ask for money or details, act confused or ask why it's needed."
-        )
         
         formatted_history = []
         for msg in history:
             role = "user" if msg.sender == "scammer" else "model"
             formatted_history.append({"role": role, "parts": [msg.text]})
         
-        # Add current message
-        formatted_history.append({"role": "user", "parts": [text]})
-
         try:
-            # We can't easily inject system prompt into chat history without specific API structure
-            # easier to just concat for single turn or use chat session if persistent.
-            # For this API, it's stateless per request, but we have history.
-            # We'll use start_chat with history.
-            chat = self.model.start_chat(history=formatted_history[:-1])
+            # Start chat with history
+            chat = self.model.start_chat(history=formatted_history)
             response = chat.send_message(text)
             return response.text
         except Exception as e:
             print(f"LLM GENERATION ERROR: {e}")
             # Fallback if history structure fails or API error
-            full_prompt = f"{system_prompt}\n\nThe conversation so far:\n{history}\n\nScammer says: {text}\n\nLakshmi:"
+            full_prompt = f"{self.system_instruction}\n\nThe conversation so far:\n{history}\n\nScammer says: {text}\n\nLakshmi:"
             try:
                 response = self.model.generate_content(full_prompt)
                 return response.text
